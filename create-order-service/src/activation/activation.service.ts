@@ -7,12 +7,14 @@ import { Activation, ActivationDocument } from './schema/activation.schema';
 import {ParametersService} from '../parameters/parameters.service';
 import Ajv from "ajv";
 import { debugPort } from 'process';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom, map, Observable } from 'rxjs';
 
 @Injectable()
 
 export class ActivationService {
 
-  constructor(@InjectModel(Activation.name,'activation') private activationModule : Model <ActivationDocument>, private parametersService : ParametersService ){
+  constructor(@InjectModel(Activation.name,'activation') private activationModule : Model <ActivationDocument>, private parametersService : ParametersService ,private readonly httpService: HttpService){
   
   }
 
@@ -23,15 +25,15 @@ export class ActivationService {
       description: "La estructura ingresada no cumple con los requerimientos minimos"
     }
 
-    let exonarated = {
+    /*let exonarated = {
       exonerated : "" ,
       exonaratedCard:"",
       exonaratedDueDate:"",
       diplomaticExonarated:""
 
-    }
+    }*/
 
-    let lines = [{
+    /*let lines = [{
       gestionType:"",
       line:"",
       Plan:"",
@@ -47,15 +49,15 @@ export class ActivationService {
       extrafinancing: "",
       total:0,
       activationStatus: ""
-    }]
+    }]  */
     let B2BActivationObject : Record<string, any> = {};
     console.log(createActivationDto)
     const pass = this.validSchema("createActivationSchema",createActivationDto);
     console.log(pass);
     if(pass){
       B2BActivationObject = createActivationDto;
-      B2BActivationObject.exonarted = exonarated;
-      B2BActivationObject.lines = lines;
+      //B2BActivationObject.exonarted = exonarated;
+      //B2BActivationObject.lines = lines;
       console.log(createActivationDto)
 
     
@@ -76,7 +78,7 @@ export class ActivationService {
 
     const pass = this.validSchema("approvalProcess",body);
     console.log(pass);
-    let temp ;
+
     if(pass){
       let orderRequest = await this.findOne(body.id); //obtener el registro por ID 
       
@@ -93,7 +95,6 @@ export class ActivationService {
           break;
         case "Excepción":
           break;
-
       }
 
       return "Balalala"
@@ -122,8 +123,7 @@ export class ActivationService {
     let pass = false; // variable que indica si existen lineas a activar o no
     for(let i = 0; i< orderRequest.lines.length; i++){ // recorre las linesa y verifica que esten disponibles para aplicar
       if(orderRequest.lines[i].status === 'Disponible' ){
-        pass = true;
-        console.log("pasooo al ciclo balala")
+        pass = true; // indica que si existen lineas a activar
       }
     }
 
@@ -138,64 +138,61 @@ export class ActivationService {
 
   async approvalProcessClientAcceptance(orderRequest: any, orderStatus : string ){
     
-    let newOrder = { // obbjeto donde se almacena el JSON de respuesta
+    let newOrder = { // objeto donde se almacena el JSON de respuesta
       orderstatus : "" ,
       newOrderRequest : orderRequest
     };
-    let mail = {
+    
+    let mail = { // objeto de respuesta para el envio de correo
       to:"",
       mailBody:""
     }
-     
-    let newApprover = {
-      approver :"",
-      function : "Excepción",
-      asignedDate: new Date()
-    }
+    
 
     let pass = false; // variable que indica si existen lineas con DPG
     let exception = false; // variable que indica si existe en la solicitud un responsable de excepción 
+    let user; // variable para almacenar el usuario responsable
 
-
-    if(orderStatus === "Rechazado"){
+    if(orderStatus === "Rechazado"){ // significa que debe ir a excepción
      
       if(orderRequest.hasOwnProperty('approverHistory')){ // significa que ya fue asignado anteriormente el aprobador
-        for(let i = 0; i< orderRequest.approverHistory.length; i++){ // recorre el historial y verifica que apliquen a DPG
+        for(let i = 0; i< orderRequest.approverHistory.length; i++){ // recorre el historial para identificar quien atendio la gestion
           if(orderRequest.lines[i].function === 'Excepción' ){
             exception = true; 
-            mail.to = orderRequest.lines[i].approver;
-            newApprover.approver = orderRequest.lines[i].approver;
+            //user = orderRequest.lines[i].approver;
+            //newApprover.approver = orderRequest.lines[i].approver;
+
+            //falta obtener el usuario
+
+
           }
         }
       } else { // se debe obtener un nuevo aprobador para la excepción
         let approverParameter : Record<string, any> = {}; //variable para guardar la respuesta
-        approverParameter = await this.parametersService.findByName("Approvers");
-        console.log(JSON.stringify(approverParameter));
-        let approverParameterTemp =approverParameter[0];
-        console.log(approverParameterTemp.parameter.length);
+        approverParameter = await this.parametersService.findByName("Approvers"); // se obtienen los aprobadores de los parametros
+        
+        let approverParameterTemp = approverParameter[0];
         
         let minAssignedTickets = 10000000;
-        let user;
-        for(let i = 0 ; i< approverParameterTemp.parameter.length;i++){
-          console.log(approverParameterTemp.parameter[i]);
-          if(approverParameterTemp.parameter[i].assignedTickets < minAssignedTickets){
+        
+        for(let i = 0 ; i< approverParameterTemp.parameter.length;i++){ // se recorren los aprobadores para identificar el que tenga menos tickets
+      
+          if(approverParameterTemp.parameter[i].assignedTickets < minAssignedTickets){// actualiza a quien tiene menos
             
-            user = approverParameterTemp.parameter[i];
+            user = approverParameterTemp.parameter[i]; // obtener el objeto aprobador del parametro
             minAssignedTickets = approverParameterTemp.parameter[i].assignedTickets;
           }
-        }
-        console.log(JSON.stringify(user));
-        // obtener el aprobador del parametro
-        //validarlo con el metodo de WS
-        //crear el JSON
-
+        }       
+        //crear el JSON 
       }
       
+      const approverArray = await this.getApprovers(user.name,"Excepción"); //Obtener la jearquia de aprobación
+      console.log(JSON.stringify(approverArray));
 
       // contruir el JSON de mail
       newOrder.orderstatus='Excepción';
       newOrder.newOrderRequest.requestStatus='Excepción'
-    } else{
+    } else{ // significa que debe avanzar a la activación
       
       for(let i = 0; i< orderRequest.lines.length; i++){ // recorre las linesa y verifica que apliquen a DPG
         if(orderRequest.lines[i].DPG === 'Si' ){
@@ -426,6 +423,57 @@ export class ActivationService {
    }
 
     return temp;
+  }
+
+  async getUser(user: string){
+    //console.log(this.httpService.get('http://192.168.107.101:8018/?user=dario.cardona'));
+    return this.httpService.get('http://192.168.107.101:8018/?user='+user).pipe(map((res) => res.data));
+  }
+
+  async getApprovers (user: string, userFunction: string){
+    console.log(user);
+
+    const myObservable = await this.getUser("dario.cardona"); // Invocación del WS de consulta RRHH
+    const activeUser = await lastValueFrom(myObservable);
+    //console.log(JSON.stringify(activeUser))
+    
+    let newApproverArray = []; // arreglo para almacenar los aprobadores
+    let newApprover = <any> { // objeto aprobador
+      approver :"",
+      function : "",
+      comment:"",
+      status:"",
+      asignedDate: new Date()
+    }
+    for(let i = 0; i< activeUser.data.length; i++){
+          
+      let temp = <any> { // objeto temporal aprobador
+        approver :"",
+        function : userFunction,
+        comment:"",
+        status:"",
+        asignedDate: new Date()
+      }
+
+      if(!activeUser.data[i].reassign){// esta disponible para asignación
+
+        temp.approver = activeUser.data[i].fullname;
+        temp.status = "Pendiente";
+        newApproverArray.push(temp);
+
+      }else { // cuenta con una delegación
+       
+        temp.approver = activeUser.data[i].fullname;
+        temp.status = "Delegado";
+        temp.comment = activeUser.data[i].comment;
+        temp.responseDate = new Date();
+        newApproverArray.push(temp);
+
+      }
+     }
+
+     return newApproverArray;
+
   }
 
 }

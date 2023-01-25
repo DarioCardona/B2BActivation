@@ -4,6 +4,7 @@ import { ActivationController } from './activation.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Activation, ActivationSchema } from './schema/activation.schema';
 import { ParametersModule } from 'src/parameters/parameters.module';
+import { HttpModule } from '@nestjs/axios';
 
 
 @Module({
@@ -15,7 +16,8 @@ import { ParametersModule } from 'src/parameters/parameters.module';
         schema: ActivationSchema
 
       }
-    ],'activation')
+    ],'activation'),
+    HttpModule
   ],
   controllers: [ActivationController],
   providers: [ActivationService]

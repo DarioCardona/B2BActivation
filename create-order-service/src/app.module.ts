@@ -11,10 +11,10 @@ import { ParametersModule } from './parameters/parameters.module';
   providers: [AppService],
   imports: [
     ActivationModule,
-    MongooseModule.forRoot('mongodb://localhost/activation', {
+    MongooseModule.forRoot('mongodb+srv://admin:admin@b2bactivation.lzod6wf.mongodb.net/?retryWrites=true&w=majority', {  //local 'mongodb://localhost/activation'
       connectionName: 'activation',
     }),
-    MongooseModule.forRoot('mongodb://localhost/activationParameters', {
+    MongooseModule.forRoot('mongodb+srv://admin:admin@b2bactivation.lzod6wf.mongodb.net/?retryWrites=true&w=majority', { //local 'mongodb://localhost/activationParameters'
       connectionName: 'activationParameters',
     }),
     ParametersModule
