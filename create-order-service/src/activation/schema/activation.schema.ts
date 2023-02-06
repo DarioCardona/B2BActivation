@@ -25,12 +25,15 @@ export class Activation {
         activationDate:"Date";
         
         @Prop()
-        sellerName: "string"
+        sellerUser: "string"
 
         @Prop(raw(
             {
                 "sellerCode": {
                   "type": "Number"
+                },
+                "sellerName": {
+                  "type": "String"
                 },
                 "channel": {
                   "type": "String"
@@ -89,36 +92,36 @@ export class Activation {
     
     @Prop(raw(
       {
-        "legalRepresentative": {
-          "type": "String"
+        legalRepresentative: {
+          type: String
         },
-        "clientName": {
-          "type": "String"
+        clientName: {
+          type: String
         },
-        "representativeMail": {
-          "type": "String"
+        representativeMail: {
+          type: String
         },
-        "representativePhone": {
-          "type": "Number"
+        representativePhone: {
+          type: Number
         },
-        "representativeDNI": {
-          "type": "String"
+        representativeDNI: {
+          type: String
         },
-        "cityMunicipaly": {
-          "type": "String"
+        cityMunicipaly: {
+          type: String
         },
-        "neighbourhood": {
-          "type": "String"
+        neighbourhood: {
+          type: String
         },
-        "address": {
-          "type": "String"
+        address: {
+          type: String
         },
-        "principalPhone": {
-          "type": "Number"
+        principalPhone: {
+          type: Number
         }
       }
   ))
-  client: any
+  client: Record<string, any>;
   
   @Prop([Object])
   lines:Object []
