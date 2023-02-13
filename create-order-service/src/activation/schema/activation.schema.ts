@@ -8,6 +8,9 @@ export class Activation {
     
         @Prop()
         approver:"String";
+
+        @Prop()
+        serviceAccount:"String";
         
         @Prop()
         requestID:"Number";
@@ -18,7 +21,7 @@ export class Activation {
         @Prop({default:"Creación"})
         requestStatus: "String";
 
-        @Prop({default: Date()})
+        @Prop({default: Date().toLocaleString()})
         insertDate:"Date";
         
         @Prop()

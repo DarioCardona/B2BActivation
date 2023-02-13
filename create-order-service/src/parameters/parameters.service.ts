@@ -4,11 +4,12 @@ import mongoose, { Model } from 'mongoose';
 import { CreateParameterDto } from './dto/create-parameter.dto';
 import { UpdateParameterDto } from './dto/update-parameter.dto';
 import { Parameters, ParametersDocument } from './schema/parameters.schema';
+import { Sequence, SequenceDocument } from './schema/sequence.schema';
 
 @Injectable()
 export class ParametersService {
 
-  constructor(@InjectModel(Parameters.name,'activationParameters') private activationParameterModule : Model <ParametersDocument>,  ){
+  constructor(@InjectModel(Parameters.name,'activationParameters') private activationParameterModule : Model <ParametersDocument> ,@InjectModel(Sequence.name,'activationParameters') private SequenceModule : Model <SequenceDocument>  ){
   
   }
   async create(createParameterDto: CreateParameterDto) {
@@ -27,7 +28,7 @@ export class ParametersService {
   }
 
   async findOne(id: string) {
-    console.log('soy FindOne');
+    //console.log('soy FindOne');
     const error = {
       code : 101,
       description: "El id indicado no existe en la base de datos"
@@ -76,6 +77,13 @@ export class ParametersService {
     } catch (e){
       return error;
     }
+  }
+
+  async getID(){
+    const _id =  new mongoose.Types.ObjectId('63ea95762487fdd28e2e4be5');
+    const getActivationSequence = await this.SequenceModule.findOneAndUpdate({_id:_id},{ $inc: { "seq": 1 }},{ new: true }).lean()
+    //console.log(getActivationSequence)
+    return getActivationSequence;
   }
 
 }

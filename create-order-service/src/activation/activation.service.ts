@@ -12,8 +12,6 @@ import { lastValueFrom, map, Observable } from 'rxjs';
 import { Console, timeLog } from 'console';
 import axios from 'axios'
 
-//import {nodemailer} from 'nodemailer';
-const nodemailer = require("nodemailer");
 
 @Injectable()
 
@@ -63,7 +61,9 @@ export class ActivationService {
       B2BActivationObject = createActivationDto;
       //B2BActivationObject.exonarted = exonarated;
       //B2BActivationObject.lines = lines;
-      console.log(createActivationDto)
+      const ID = await this.parametersService.getID();
+      B2BActivationObject.requestID = ID.seq;
+     
 
     
       const activationCreated = await this.activationModule.create(B2BActivationObject)
@@ -155,6 +155,10 @@ export class ActivationService {
     if (!pass){ // validación si existen lineas a aplicar
       newOrder.orderstatus='Rechazado';
       newOrder.newOrderRequest.requestStatus='Rechazado'
+
+      //Envio de correo.
+      const mail = this.sendEmail( orderRequest.sellerUser+'@tigo.com.hn','Rechazado','','1234567');
+
     } else {
       console.log(orderRequest.client);
       if( JSON.stringify(orderRequest.client) !== JSON.stringify({})){ // Valida si el cliente es nuevo o no
@@ -172,15 +176,17 @@ export class ActivationService {
         newOrder.newOrderRequest.requestStatus ='Aprobación Cliente';
         userTemp.name = orderRequest.sellerUser;
         user = userTemp;
-        //tarea del solicitante
+        
       }
 
       //obtener aprobador
-      const approverArray = await this.getApprovers(user.name,newOrder.orderstatus); //Obtener la jearquia de aprobación
+      const approverArray = await this.getApprovers(user.name,newOrder.orderstatus,orderRequest.sellerUser,"orderRequest._id"); //Obtener la jearquia de aprobación
       //console.log(JSON.stringify(approverArray));
       for(let i = 0; i< approverArray.length; i++){
         newOrder.newOrderRequest.approverHistory.push(approverArray[i]);
       }
+
+      
 
     }   
     
@@ -194,12 +200,7 @@ export class ActivationService {
       orderstatus : "" ,
       newOrderRequest : orderRequest
     };
-    
-    let mail = { // objeto de respuesta para el envio de correo
-      to:"",
-      mailBody:""
-    }
-    
+        
 
     let pass = false; // variable que indica si existen lineas con DPG
     let exception = false; // variable que indica si existe en la solicitud un responsable de excepción 
@@ -237,7 +238,7 @@ export class ActivationService {
       }
       
       console.log(JSON.stringify(user));
-      const approverArray = await this.getApprovers(user.name,"Excepción"); //Obtener la jearquia de aprobación
+      const approverArray = await this.getApprovers(user.name,"Excepción",orderRequest.sellerUser,"orderRequest._id"); //Obtener la jearquia de aprobación
       //console.log(JSON.stringify(approverArray));
       for(let i = 0; i< approverArray.length; i++){
         newOrder.newOrderRequest.approverHistory.push(approverArray[i]);
@@ -245,9 +246,7 @@ export class ActivationService {
       
       
       newOrder.orderstatus='Excepción'; // actualización de la respuesta
-      newOrder.newOrderRequest.requestStatus='Excepción'
-
-      // contruir el JSON de mail
+      newOrder.newOrderRequest.requestStatus='Excepción';
 
 
     } else{ // significa que debe avanzar a la activación
@@ -265,7 +264,9 @@ export class ActivationService {
         newOrder.orderstatus='Procesar';
         newOrder.newOrderRequest.requestStatus='Procesar'
       }
+      //Envio de correo (Notificar al solicitante que ya avanzo la gestion y a que debe ir)
 
+      const mail = this.sendEmail( orderRequest.sellerUser+'@tigo.com.hn','newOrder.orderstatus','',orderRequest._id);
     }
 
     return newOrder;
@@ -286,6 +287,9 @@ export class ActivationService {
       newOrder.orderstatus='Rechazado';
       newOrder.newOrderRequest.requestStatus='Rechazado';
 
+      //envio de correo
+      const mail = this.sendEmail( orderRequest.sellerUser+'@tigo.com.hn','Rechazado','',orderRequest._id);
+
     } else { // si se aprueba significa que debe avanzar a Aprobación cliente
       
       newOrder.orderstatus ='Aprobación Cliente';
@@ -293,7 +297,7 @@ export class ActivationService {
       userTemp.name = orderRequest.sellerUser;
       user = userTemp;
       
-      const approverArray = await this.getApprovers(user.name,newOrder.orderstatus); //Obtener la jearquia de aprobación
+      const approverArray = await this.getApprovers(user.name,newOrder.orderstatus,orderRequest.sellerUser,"orderRequest._id"); //Obtener la jearquia de aprobación
       for(let i = 0; i< approverArray.length; i++){
         newOrder.newOrderRequest.approverHistory.push(approverArray[i]);
       }
@@ -337,9 +341,8 @@ export class ActivationService {
       code : 101,
       description: "El id indicado no existe en la base de datos"
     }
-    const mail = this.sendEmail('dario.cardona@tigo.com.hn','Excepción', 'dario.cardona@tigo.com.hn','1234567');
     try{
-      const getActivation = await this.activationModule.findById(id)
+      const getActivation = await this.activationModule.findById(id).lean()
       return getActivation;
     } catch (e){
       return error;
@@ -516,7 +519,8 @@ export class ActivationService {
     return this.httpService.get('http://192.168.107.101:8011/?user='+user).pipe(map((res) => res.data));
   }
 
-  async getApprovers (user: string, userFunction: string){
+  async getApprovers (user: string, userFunction: string, requester:string, requestID: string){
+    
     
     const myObservable = await this.getUser(user); // Invocación del WS de consulta RRHH
     const activeUser = await lastValueFrom(myObservable);
@@ -524,6 +528,8 @@ export class ActivationService {
     
     let newApproverArray = []; // arreglo para almacenar los aprobadores
     
+    let sendEmailUser= "";
+
     for(let i = 0; i< activeUser.data.length; i++){
           
       let temp = <any> { // objeto temporal aprobador
@@ -546,11 +552,15 @@ export class ActivationService {
 
         temp.approver = activeUser.data[i].FullName;
         temp.status = "Pendiente";
+        sendEmailUser = activeUser.data[i].UserLogin;
         newApproverArray.push(temp);
         
       }
      }
 
+     //envio de correo
+     const mail = this.sendEmail( sendEmailUser+'@tigo.com.hn',userFunction, requester+'@tigo.com.hn','1234567');
+     
      return newApproverArray;
 
   }
@@ -635,4 +645,5 @@ export class ActivationService {
     console.log(Answered);
     return true;
   }
+
 }

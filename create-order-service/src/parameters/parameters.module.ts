@@ -3,6 +3,7 @@ import { ParametersService } from './parameters.service';
 import { ParametersController } from './parameters.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Parameters, ParametersSchema } from './schema/parameters.schema';
+import { Sequence, SequenceSchema } from './schema/sequence.schema';
 
 @Module({
   imports:[
@@ -11,8 +12,13 @@ import { Parameters, ParametersSchema } from './schema/parameters.schema';
         name: Parameters.name,
         schema: ParametersSchema
 
+      },
+      {
+        name: Sequence.name,
+        schema: SequenceSchema
+
       }
-    ],'activationParameters')
+    ],'activationParameters'),
   ],
   controllers: [ParametersController],
   providers: [ParametersService], 
