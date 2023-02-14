@@ -54,9 +54,9 @@ export class ActivationService {
       activationStatus: ""
     }]  */
     let B2BActivationObject : Record<string, any> = {};
-    console.log(createActivationDto)
+   
     const pass = this.validSchema("createActivationSchema",createActivationDto);
-    console.log(pass);
+   
     if(pass){
       B2BActivationObject = createActivationDto;
       //B2BActivationObject.exonarted = exonarated;
@@ -396,6 +396,16 @@ export class ActivationService {
       additionalProperties: false,
     }
 
+    const startActivation = {
+      type:"object",
+        properties:{
+          id: {type: "string" },
+          status: {type: "string" }
+        },
+      required: ["id","status"],
+      additionalProperties: false,
+    }
+
     const createActivationSchema = {
       type: "object",
       properties: {
@@ -508,6 +518,9 @@ export class ActivationService {
       break;
     case "approvalProcess":
       temp = approvalProcess;
+      break;
+    case "startActivation":
+      temp = startActivation;
       break;
    }
 
@@ -646,4 +659,60 @@ export class ActivationService {
     return true;
   }
 
+  async startActivation (body:any){
+    const error = {
+      code : 101,
+      description: "La estructura ingresada no cumple con los requerimientos minimos"
+    }
+    const pass = this.validSchema("startActivation",body); //valida que la estrutura sea la correcta
+    if(pass){
+      let orderRequest = await this.findOne(body.id); //obtener el registro por ID 
+      
+      if('code' in orderRequest){ //Si el id que enviaron no existe 
+        error.code = 102;
+        error.description = `El id ${body.id} no existe a nivel de base de datos`;
+        return error;
+      }
+      let activation ;
+      if(body.status === "DPG"){
+        activation = await this.DPGActivation(orderRequest);
+      } else if(body.status === "Procesar"){
+        activation = await this.normalActivation(orderRequest);
+      }else{
+        error.code = 103;
+        error.description = `El status ingresado ${body.status} no aplica`;
+        return error;
+      }
+      return activation;
+    } else {
+      return error;
+    }
+  }
+
+  async DPGActivation(orderRequest: any){
+    let totalDPG = 0;
+    let line = "";
+    let lineObject : Record<string, any> = {}; //variable para guardar el objeto 
+
+    for(let i = 0; i< orderRequest.lines.length; i++){ // recorre las linesa y verifica que apliquen a DPG
+      if(orderRequest.lines[i].DPG === 'Si' ){ // identifica si es linea DPG
+        totalDPG += orderRequest.lines[i].DPGValue; // acumula el total del DPG
+        if(line === "" && orderRequest.lines[i].line !== "Nueva"){
+          line = orderRequest.lines[i].line; // Asigna la linea a la cual se le aplicara DPG
+          lineObject = orderRequest.lines[i]; // Almacena el objeto de la linea.
+        }
+      }
+    }
+    // construir el objeto para la invocación
+    return true;
+  }
+
+  async normalActivation(orderRequest: any){
+    for(let i = 0; i< orderRequest.lines.length; i++){ // recorre las linesa 
+      if(orderRequest.lines[i].status === "Disponible"){
+         // construir el objecto para la invocación
+      }
+    }
+    return true;
+  }
 }

@@ -19,7 +19,11 @@ export class ActivationController {
     return this.activationService.approvalProcess(body);
   }
 
-
+  @Post('startActivation')
+    startActivation(@Body() body:any){
+      return this.activationService.startActivation(body);
+  }
+  
   @Get()
   findAll(@Body() findAllActivation) {
     return this.activationService.findAll(findAllActivation);
@@ -35,5 +39,6 @@ export class ActivationController {
     return this.activationService.update(id, updateActivationDto);
   }
 
+  
   
 }
