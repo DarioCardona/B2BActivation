@@ -438,6 +438,17 @@ export class ActivationService {
       additionalProperties: false,
     }
 
+    const updateLine = {
+      type:"object",
+        properties:{
+          id: {type: "string"},
+          lineStatus: {type: "string" },
+          description: {type: "string" },
+          line: {type: "string" }
+        },
+      required: ["id","lineStatus","description","line"],
+      additionalProperties: false,
+    }
     
 
     const exonerated = {
@@ -521,6 +532,9 @@ export class ActivationService {
       break;
     case "startActivation":
       temp = startActivation;
+      break;
+    case "updateLine":
+      temp = updateLine;
       break;
    }
 
@@ -704,6 +718,7 @@ export class ActivationService {
       }
     }
     // construir el objeto para la invocación
+    //si es linea nueva y DPG entonces voy a enviar el primer registro
     return true;
   }
 
@@ -714,5 +729,62 @@ export class ActivationService {
       }
     }
     return true;
+  }
+
+  async updateLine(body:any){
+    
+    const error = {
+      code : 101,
+      description: "La estructura ingresada no cumple con los requerimientos minimos"
+    }
+    const pass = this.validSchema("updateLine",body); //valida que la estrutura sea la correcta
+    
+    if(pass){
+      let splitted = body.id.split("-",2);// descomponer ID mongo y elemento enviado
+      let position = splitted[1] - 1;
+      let requestID = splitted[0];
+      
+      let orderRequest : Record<string, any> = {};
+      orderRequest = await this.findOne(requestID); //obtener el registro por ID 
+      
+      if('code' in orderRequest){ //Si el id que enviaron no existe 
+        error.code = 102;
+        error.description = `El id ${requestID} no existe a nivel de base de datos`;
+        return error;
+      }
+
+      orderRequest.lines[position].activationStatus = body.lineStatus;
+      if(orderRequest.lines[position].gestionType === "Nueva"){
+        orderRequest.lines[position].line = body.line;
+        // !aqui se podria actualizar el DPG , pero de depende de ver que retorna el de DPG la invocación a Marce
+      }
+
+      //Actualizar el registro en la DB 
+      const updateActivation = await this.update(requestID, orderRequest );
+
+      let pendingLines;
+      if(orderRequest.DPG === body.line){ //validar si la linea era linea DPG
+         // Aqui se envia startActivation
+         const activation  = {
+          id:requestID,
+          status:"Procesar"
+         }
+         this.startActivation(activation);
+
+      } else {
+        
+        pendingLines = orderRequest.lines.findIndex(item => item.activationStatus === "");//Verifica si ya todas fueran actualizadas
+      }
+      
+      if(pendingLines === -1){ // significa que no existen lineas pendientes
+        // envio de correo
+        const mail = this.sendEmail( orderRequest.sellerUser+'@tigo.com.hn','Compleatado','',orderRequest.requestID);
+       // console.log("balalala");
+      }
+      
+      return true;
+
+    }
+    return error;
   }
 }

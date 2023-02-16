@@ -24,6 +24,11 @@ export class ActivationController {
       return this.activationService.startActivation(body);
   }
   
+  @Post('updateLine')
+    updateLine(@Body() body:any){
+      return this.activationService.updateLine(body);
+  }
+  
   @Get()
   findAll(@Body() findAllActivation) {
     return this.activationService.findAll(findAllActivation);
